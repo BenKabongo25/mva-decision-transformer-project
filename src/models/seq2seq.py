@@ -67,8 +67,9 @@ class Seq2SeqDiscreteAction(nn.Module):
         embeddings = self.dropout(embeddings)
 
         _, hiddens = self.encoder(embeddings)
+        # TODO: None
         last_state  = states[:, -1, :].unsqueeze(1)
         last_action = actions[:, -1, :].unsqueeze(1)
         last_reward = rewards[:, -1, :].unsqueeze(1)
-        decoder_input = # TODO:
+        decoder_input = #
         
