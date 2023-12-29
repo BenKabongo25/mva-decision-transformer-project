@@ -12,7 +12,7 @@ import numpy as np
 from typing import Any, Union
 
 
-## Range ##########################################################################################
+## Base ###########################################################################################
 
 class Range(object):
 
@@ -25,9 +25,18 @@ class Range(object):
         self.n = len(self.values)
 
 
+class DiscreteWrapper(object):
+    
+    def __init__(self):
+        self.n_values = 0
+
+    def get(self, index):
+        raise NotImplementedError
+
+
 ## Discrete Space #################################################################################
 
-class DiscreteSpaceWrapper(object):
+class DiscreteSpaceWrapper(DiscreteWrapper):
 
     def __init__(self, range_: Range):
         self.range = range_
@@ -62,7 +71,7 @@ class DiscreteObservationWrapper(gym.ObservationWrapper, DiscreteSpaceWrapper):
 
 ## Multi Binary Spaces ############################################################################
 
-class DiscreteMultiBinaryWrapper(object):
+class DiscreteMultiBinaryWrapper(DiscreteWrapper):
 
     def __init__(self, n: int):
         assert n > 0
@@ -109,7 +118,7 @@ class DiscreteObservationMultiBinaryWrapper(gym.ObservationWrapper, DiscreteMult
 
 ## Multi Discrete Spaces ##########################################################################
 
-class DiscreteMultiDiscreteWrapper(object):
+class DiscreteMultiDiscreteWrapper(DiscreteWrapper):
 
     def __init__(self, ns: Union[tuple, list, np.array]):
         if isinstance(ns, (tuple, list)):
