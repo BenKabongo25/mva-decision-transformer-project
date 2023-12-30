@@ -74,13 +74,9 @@ class DeterministicMDPPolicy(MDPPolicy):
                 v += p_s * get_value(s, a, next_s)
             
         else:
-            other_s = list(range(self.model.config.n_states))
-            del other_s[s]
-
-            for next_s in other_s:
-                next_s_probs = self.model.transition_function(s, a, next_s)
-                for next_s, p_s in next_s_probs.items():
-                    v += p_s * get_value(s, a, next_s)
+            for next_s in range(self.model.config.n_states):
+                p_s = self.model.transition_function(s, a, next_s)
+                v += p_s * get_value(s, a, next_s)
 
         return v
 

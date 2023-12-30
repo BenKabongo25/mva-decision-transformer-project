@@ -9,7 +9,7 @@ import enum
 import gym
 import gym.spaces
 import numpy as np
-from typing import Any, Union, Callable
+from typing import Any, Callable, Tuple, Union
 from wrappers import DiscreteWrapper
 
 
@@ -68,20 +68,24 @@ class MarkovDecisionProcess(gym.Env):
     :param actions: action space | wrapper
     :param transition_function
     :param reward_function
+    :param terminate_function
     """
 
-    def __init__(self, 
-                config: MDPConfig,
-                states: Union[DiscreteWrapper, gym.spaces.Space], 
-                actions: Union[DiscreteWrapper, gym.spaces.Space],
-                transition_function: Callable=lambda s, a, next_s: None,
-                reward_function: Callable=lambda s, a, next_s, r: None,
-                all_rewards: Union[list, np.ndarray]=None):
-
-        self.config = config
+    def __init__(self, config: MDPConfig):
+        self.config = config 
+        
+        
+    def init(self,
+            states: Union[DiscreteWrapper, gym.spaces.Space], 
+            actions: Union[DiscreteWrapper, gym.spaces.Space],
+            transition_function: Callable=lambda s, a, next_s: None,
+            reward_function: Callable=lambda s, a, next_s, r: None,
+            terminate_function: Callable=lambda s: False,
+            all_rewards: Union[list, np.ndarray]=None):
 
         self.observation_wrapper = None
         self.action_wrapper = None
+        self._current_state = 0
 
         if isinstance(states, gym.ObservationWrapper):
             self.observation_wrapper = states
@@ -105,17 +109,18 @@ class MarkovDecisionProcess(gym.Env):
         
         if self.config.action_space_type is SpaceType.DISCRETE:
             assert isinstance(self.action_wrapper, DiscreteWrapper)
-            self.config.n_actions = self.observation_wrapper.n_values
+            self.config.n_actions = self.action_wrapper.n_values
 
         self._transition_function = transition_function
         self._reward_function = reward_function
+        self._terminate_function = terminate_function
 
         self.all_rewards = all_rewards
         if self.config.reward_function_type is MDPRewardType.SASR:
             assert self.all_rewards is not None
 
 
-    def transition_function(self, s: Any, a: Any=None, next_s: Any=None) -> Union[float, dict, Any, np.ndarray]:
+    def transition_function(self, s: Any, a: Any=None, next_s: Any=None) -> Union[int, float, dict]:
         """
         Transition function between states
         :param s: current state
@@ -130,11 +135,11 @@ class MarkovDecisionProcess(gym.Env):
                 float: probability
         """
         assert s is not None
-        assert self.observation_space.contains(s)
+        assert self.observation_space.contains(s), str(s)
 
         if self.config.transition_function_type is MDPTransitionType.S_DETERMINISTIC:
             next_s = self._transition_function(s, None, None)
-            assert self.observation_space.contains(next_s)
+            assert self.observation_space.contains(next_s), str(next_s)
             return next_s
 
         if self.config.transition_function_type is MDPTransitionType.S_PROBABILISTIC:
@@ -143,16 +148,16 @@ class MarkovDecisionProcess(gym.Env):
                 assert len(next_s_probs) == self.config.n_states
             next_ss, probs = next_s_probs.items()
             for next_s in next_ss:
-                assert self.observation_space.contains(next_s)
+                assert self.observation_space.contains(next_s), str(next_s)
             assert np.sum(probs) == 1
             return next_s_probs
 
         assert a is not None
-        assert self.action_space.contains(a)
+        assert self.action_space.contains(a), str(a)
 
         if self.config.transition_function_type is MDPTransitionType.SA_DETERMINISTIC:
             next_s = self._transition_function(s, a, None)
-            assert self.observation_space.contains(next_s)
+            assert self.observation_space.contains(next_s), str(next_s)
             return next_s
 
         if self.config.transition_function_type is MDPTransitionType.SA_PROBABILISTIC:
@@ -161,12 +166,12 @@ class MarkovDecisionProcess(gym.Env):
                 assert len(next_s_probs) == self.config.n_states
             next_ss, probs = next_s_probs.items()
             for next_s in next_ss:
-                assert self.observation_space.contains(next_s)
+                assert self.observation_space.contains(next_s), str(next_s)
             assert np.sum(probs) == 1
             return next_s_probs
 
         assert next_s is not None
-        assert self.observation_space.contains(next_s)
+        assert self.observation_space.contains(next_s), str(next_s)
 
         next_s_prob = self._transition_function(s, a, next_s)
         return next_s_prob
@@ -185,21 +190,69 @@ class MarkovDecisionProcess(gym.Env):
                 probability
         """
         assert s is not None
-        assert self.observation_space.contains(s)
+        assert self.observation_space.contains(s), str(a)
 
         if self.config.reward_function_type in (MDPRewardType.SA, MDPRewardType.SAS, MDPRewardType.SASR):
             assert a is not None
-            assert self.action_space.contains(a)
+            assert self.action_space.contains(a), str(a)
 
         if self.config.reward_function_type in (MDPRewardType.SAS, MDPRewardType.SASR):
             assert next_s is not None
-            assert self.observation_space.contains(next_s)
+            assert self.observation_space.contains(next_s), str(next_s)
 
         if self.config.reward_function_type in (MDPRewardType.SASR,):
             assert r is not None
 
         r_or_prob = self._reward_function(s, a, next_s, r)
         return r_or_prob
+
+
+    def reset(self, seed: int = None, options: dict = None) -> Tuple[int, dict]:
+        super().reset(seed=seed, options=options)
+        observation = self._current_state
+        info = {}
+        self._current_state = 0
+        return observation, info
+
+
+    def step(self, action: int) -> Tuple[int, float, bool, bool, dict]:
+        s = self._current_state
+        a = action
+        next_s = None
+        r = None
+        info = {}
+
+        if self.config.transition_function_type in (MDPTransitionType.S_DETERMINISTIC,
+                                                    MDPTransitionType.SA_DETERMINISTIC):
+            next_s = self.transition_function(s, a, None)
+
+        elif self.config.transition_function_type in (MDPTransitionType.S_PROBABILISTIC,
+                                                      MDPTransitionType.SA_PROBABILISTIC):
+            next_s_probs = self.transition_function(s, a, None)
+            next_ss, probs = next_s_probs.items()
+            next_s = self.np_random.choice(next_ss, p=probs, size=1)
+            
+        else:
+            next_ss = np.arange(self.config.n_states)
+            probs = np.zeros_like(next_ss)
+            for next_s in next_ss:
+                p_s = self.transition_function(s, a, next_s)
+                probs[next_s] = p_s
+            next_s = self.np_random.choice(next_ss, p=probs, size=1)
+
+        if self.config.reward_function_type is not MDPRewardType.SASR:
+            r = self.reward_function(s, a, next_s, None)
+                
+        else:
+            probs = np.zeros_like(self.all_rewards)
+            for i, r in enumerate(self.all_rewards):
+                p_r = self.reward_function(s, a, next_s, r)
+                probs[i] = p_r
+            r = self.np_random.choice(self.all_rewards, p=probs, size=1)
+
+        terminated = self._terminate_function(next_s)
+        
+        return next_s, r, terminated, False, info
 
 
 MDP = MarkovDecisionProcess
