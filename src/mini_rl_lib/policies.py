@@ -56,7 +56,7 @@ class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
             else:
                 for r in self.model.all_rewards:
                     p_r = self.model.reward_function(s, a, next_s, r)
-                    v += p_r * (r + self.gamma )
+                    v += p_r * (r + self.gamma * self._values[next_s])
 
             return v
 
