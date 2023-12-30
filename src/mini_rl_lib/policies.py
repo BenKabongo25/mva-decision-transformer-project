@@ -26,25 +26,25 @@ class DeterministicMDPPolicy(MDPPolicy):
     def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
         super().__init__(model)
         self.gamma = gamma
-        self.eps = eps
-
-
-class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
-
-    def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
-        super().__init__(model, gamma, eps)
+        self.eps = eps        
         self._values = np.zeros(model.config.n_states)
         self._policy = np.zeros(model.config.n_states, dtype=int)
 
 
-    def init(self, values: np.ndarray, policy: np.ndarray):
-        assert len(values) == self.model.config.n_states
-        assert len(policy) == self.model.config.n_states
-        assert np.all(policy >= 0) and np.all(policy < self.model.config.n_actions)
-        self._values = values
-        self._policy = policy
+    def init(self, values: np.ndarray=None, policy: np.ndarray=None):
+        if values is not None:
+            assert len(values) == self.model.config.n_states
+            self._values = values
+        if policy is not None:
+            assert len(policy) == self.model.config.n_states
+            assert np.all(policy >= 0) and np.all(policy < self.model.config.n_actions)
+            self._policy = policy
 
 
+    def get_policy(self):
+        return self._policy
+
+    
     def _update_value(self, s: int, a: int) -> float:
         def get_value(s, a, next_s):
             v = 0
@@ -85,6 +85,35 @@ class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
         return v
 
 
+class ValueIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
+
+    def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
+        super().__init__(model, gamma, eps)
+
+
+    def fit(self):
+        delta = self.eps + 1
+        while delta > self.eps:
+            delta = 0
+            for s in range(self.model.config.n_states):
+                v = self._values[s]
+                values = np.zeros(self.model.config.n_actions)
+                for a in range(self.model.config.n_actions):
+                    va = self._update_value(s, a)
+                    values[a] = va
+                self._values[s] = np.max(values)
+                self._policy[s] = np.argmax(values)
+                delta = max(delta, np.abs(v - self._values[s]))
+
+
+class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
+
+    def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
+        super().__init__(model, gamma, eps)
+        self._values = np.zeros(model.config.n_states)
+        self._policy = np.zeros(model.config.n_states, dtype=int)
+
+
     def _update_policy(self, s: int) -> int:
         values = np.zeros(self.model.config.n_actions)
         for a in range(self.model.config.n_actions):
@@ -121,12 +150,11 @@ class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
             policy_stable = self._policy_evaluation()
 
 
-
 ## Probabilistic MDP Policy #######################################################################
+
 
 class ProbabilisticMDPPolicy(MDPPolicy):
     
     def __init__(self, model: mdp.MDP):
         super().__init__(model)
-
 

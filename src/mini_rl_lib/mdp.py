@@ -23,8 +23,7 @@ class MDPTransitionType(enum.Enum):
     S_PROBABILISTIC = 1
     SA_DETERMINISTIC = 2
     SA_PROBABILISTIC = 3
-    SAS_DETERMINISTIC = 4
-    SAS_PROBABILISTIC = 5
+    SAS = 4
 
 
 class MDPRewardType(enum.Enum):
@@ -127,7 +126,7 @@ class MarkovDecisionProcess(gym.Env):
                 next_s: next_state
             transition type = S/SA and Probabilistic
                 dict: key = next_s, value = probability
-            transition type = SAS and Deterministic/Probabilistic
+            transition type = SAS
                 float: probability
         """
         assert s is not None
