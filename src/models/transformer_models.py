@@ -110,8 +110,8 @@ class TransformerModel(nn.Module):
         self.device = device
         
         self.token_embed = nn.Embedding(num_embeddings=n_actions, embedding_dim=embedding_dim, device=device)
-        self.pos_embed = nn.Parameter(torch.zeros(1, max_length, embedding_dim), device=device)
-        self.all_pos_embed = nn.Parameter(torch.zeros(1, max_t + 1, embedding_dim), device=device)
+        self.pos_embed = nn.Parameter(torch.zeros((1, max_length, embedding_dim), device=device))
+        self.all_pos_embed = nn.Parameter(torch.zeros((1, max_t, embedding_dim), device=device))
         self.embedding_dropout = nn.Dropout(p=embedding_pdropout)
         self.blocks = nn.Sequential(*[
             TransformerBlock(embedding_dim, n_heads, attention_pdropout, output_pdropout, max_length) 
@@ -156,7 +156,7 @@ class TransformerModel(nn.Module):
             module.weight.data.fill_(1.0)
 
 
-    def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
+    def forward(self, states, actions=None, targets=None, rtgs=None, timesteps=None):
         raise NotImplementedError
 
 
@@ -195,7 +195,7 @@ class TransformerModel(nn.Module):
 
 class DecisionTransformer(TransformerModel):
 
-    def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
+    def forward(self, states, actions=None, targets=None, rtgs=None, timesteps=None):
         batch_size, length, _ = states.size()
 
         state_embeddings = self.state_encoder(
@@ -223,6 +223,7 @@ class DecisionTransformer(TransformerModel):
             all_pos_embeddings, 1, 
             torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
         ) 
+        print(position_embeddings.size())
         position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
 
         x = self.embedding_dropout(token_embeddings + position_embeddings)
@@ -236,7 +237,7 @@ class DecisionTransformer(TransformerModel):
 
 class BehaviorCloning(TransformerModel):
 
-    def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
+    def forward(self, states, actions=None, targets=None, rtgs=None, timesteps=None):
         batch_size, length, _ = states.size()
 
         state_embeddings = self.state_encoder(
@@ -256,7 +257,7 @@ class BehaviorCloning(TransformerModel):
         position_embeddings = torch.gather(
             all_pos_embeddings, 1, 
             torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
-        ) 
+        )
         position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
 
         x = self.embedding_dropout(token_embeddings + position_embeddings)
@@ -266,4 +267,3 @@ class BehaviorCloning(TransformerModel):
         logits = logits[:, 0::2, :] if actions is not None else logits
         loss = None if targets is None else F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
         return logits, loss
-        
