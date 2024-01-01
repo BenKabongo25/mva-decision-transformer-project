@@ -221,6 +221,7 @@ class MarkovDecisionProcess(gym.Env):
         next_s = None
         r = None
         info = {}
+        terminated = False
 
         if self.config.transition_function_type in (MDPTransitionType.S_DETERMINISTIC,
                                                     MDPTransitionType.SA_DETERMINISTIC):
@@ -230,7 +231,7 @@ class MarkovDecisionProcess(gym.Env):
                                                       MDPTransitionType.SA_PROBABILISTIC):
             next_s_probs = self.transition_function(s, a, None)
             next_ss, probs = next_s_probs.items()
-            next_s = self.np_random.choice(next_ss, p=probs, size=1)
+            next_s = self.np_random.choice(next_ss, p=probs)
             
         else:
             next_ss = np.arange(self.config.n_states)
@@ -238,7 +239,10 @@ class MarkovDecisionProcess(gym.Env):
             for next_s in next_ss:
                 p_s = self.transition_function(s, a, next_s)
                 probs[next_s] = p_s
-            next_s = self.np_random.choice(next_ss, p=probs, size=1)
+            if probs.sum() == 0:
+                return next_s, r, terminated, True, {"Error": "Probabilities sum to zero"}
+            probs = probs / probs.sum()
+            next_s = self.np_random.choice(next_ss, p=probs)
 
         if self.config.reward_function_type is not MDPRewardType.SASR:
             r = self.reward_function(s, a, next_s, None)
@@ -248,7 +252,10 @@ class MarkovDecisionProcess(gym.Env):
             for i, r in enumerate(self.all_rewards):
                 p_r = self.reward_function(s, a, next_s, r)
                 probs[i] = p_r
-            r = self.np_random.choice(self.all_rewards, p=probs, size=1)
+            if probs.sum() == 0:
+                return next_s, r, terminated, True, {"Error": "Probabilities sum to zero"}
+            probs = probs / probs.sum()
+            r = self.np_random.choice(self.all_rewards, p=probs)
 
         terminated = self._terminate_function(next_s)
         
