@@ -85,7 +85,7 @@ class TransformerBlock(nn.Module):
         return x
 
 
-class DecisionTransformer(nn.Module):
+class TransformerModel(nn.Module):
 
     def __init__(self,
                 n_actions,
@@ -97,7 +97,6 @@ class DecisionTransformer(nn.Module):
                 attention_pdropout=0.0,
                 embedding_pdropout=0.0,
                 output_pdropout=0.0,
-                reward_conditioned_flag=True,
                 device=None
                 ):
         super().__init__()
@@ -108,7 +107,6 @@ class DecisionTransformer(nn.Module):
         self.n_heads = n_heads
         self.n_blocks = n_blocks
         self.embedding_dim = embedding_dim
-        self.reward_conditioned_flag = reward_conditioned_flag
         self.device = device
         
         self.token_embed = nn.Embedding(num_embeddings=n_actions, embedding_dim=embedding_dim, device=device)
@@ -159,59 +157,7 @@ class DecisionTransformer(nn.Module):
 
 
     def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
-        batch_size, length, _ = states.size()
-
-        state_embeddings = self.state_encoder(
-            states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()
-            ).reshape(batch_size, length, self.embedding_dim)
-        
-        if self.reward_conditioned_flag:
-            if actions is not None: 
-                action_embeddings = self.action_embed(actions.type(torch.long).squeeze(-1))
-                rtg_embeddings = self.return_embed(rtgs.type(torch.float32))
-                token_embeddings = torch.zeros((batch_size, length * 3 - int(targets is None), self.embedding_dim), 
-                                                dtype=torch.float32, device=self.device)
-                token_embeddings[:, 0::3, :] = rtg_embeddings
-                token_embeddings[:, 1::3, :] = state_embeddings
-                token_embeddings[:, 2::3, :] = action_embeddings[:, -length + int(targets is None):, :]
-
-            else:
-                rtg_embeddings = self.return_embed(rtgs.type(torch.float32))
-                token_embeddings = torch.zeros((batch_size, length * 2, self.embedding_dim), 
-                                                dtype=torch.float32, device=self.device)
-                token_embeddings[:, 0::2, :] = rtg_embeddings
-                token_embeddings[:, 1::2, :] = state_embeddings
-
-        else:
-            if actions is not None:
-                action_embeddings = self.action_embed(actions.type(torch.long).squeeze(-1))
-                token_embeddings = torch.zeros((batch_size, length * 2 - int(targets is None), self.embedding_dim), 
-                                                dtype=torch.float32, device=self.device)
-                token_embeddings[:, 0::2, :] = state_embeddings
-                token_embeddings[:, 1::2, :] = action_embeddings[:, -length + int(targets is None):, :]
-            else:
-                token_embeddings = state_embeddings
-
-        all_pos_embeddings = torch.repeat_interleave(self.all_pos_embed, batch_size, dim=0)
-        position_embeddings = torch.gather(
-            all_pos_embeddings, 1, 
-            torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
-        ) 
-        position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
-
-        x = self.embedding_dropout(token_embeddings + position_embeddings)
-        x = self.blocks(x)
-        x = self.norm(x)
-        logits = self.fc(x)
-
-        if self.reward_conditioned_flag:
-            logits = logits[:, 1::3, :] if actions is not None else logits[:, 1:, :]
-        else:
-            logits = logits[:, 0::2, :] if actions is not None else logits
-
-        loss = None if targets is None else F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
-
-        return logits, loss
+        raise NotImplementedError
 
 
     def configure_optimizers(self, lr, weight_decay, betas):
@@ -245,3 +191,79 @@ class DecisionTransformer(nn.Module):
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=lr, betas=betas)
         return optimizer
+
+
+class DecisionTransformer(TransformerModel):
+
+    def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
+        batch_size, length, _ = states.size()
+
+        state_embeddings = self.state_encoder(
+            states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()
+            ).reshape(batch_size, length, self.embedding_dim)
+        
+        if actions is not None: 
+            action_embeddings = self.action_embed(actions.type(torch.long).squeeze(-1))
+            rtg_embeddings = self.return_embed(rtgs.type(torch.float32))
+            token_embeddings = torch.zeros((batch_size, length * 3 - int(targets is None), self.embedding_dim), 
+                                            dtype=torch.float32, device=self.device)
+            token_embeddings[:, 0::3, :] = rtg_embeddings
+            token_embeddings[:, 1::3, :] = state_embeddings
+            token_embeddings[:, 2::3, :] = action_embeddings[:, -length + int(targets is None):, :]
+
+        else:
+            rtg_embeddings = self.return_embed(rtgs.type(torch.float32))
+            token_embeddings = torch.zeros((batch_size, length * 2, self.embedding_dim), 
+                                            dtype=torch.float32, device=self.device)
+            token_embeddings[:, 0::2, :] = rtg_embeddings
+            token_embeddings[:, 1::2, :] = state_embeddings
+
+        all_pos_embeddings = torch.repeat_interleave(self.all_pos_embed, batch_size, dim=0)
+        position_embeddings = torch.gather(
+            all_pos_embeddings, 1, 
+            torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
+        ) 
+        position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
+
+        x = self.embedding_dropout(token_embeddings + position_embeddings)
+        x = self.blocks(x)
+        x = self.norm(x)
+        logits = self.fc(x)
+        logits = logits[:, 1::3, :] if actions is not None else logits[:, 1:, :]
+        loss = None if targets is None else F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
+        return logits, loss
+
+
+class BehaviorCloning(TransformerModel):
+
+    def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
+        batch_size, length, _ = states.size()
+
+        state_embeddings = self.state_encoder(
+            states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()
+            ).reshape(batch_size, length, self.embedding_dim)
+
+        if actions is not None:
+            action_embeddings = self.action_embed(actions.type(torch.long).squeeze(-1))
+            token_embeddings = torch.zeros((batch_size, length * 2 - int(targets is None), self.embedding_dim), 
+                                            dtype=torch.float32, device=self.device)
+            token_embeddings[:, 0::2, :] = state_embeddings
+            token_embeddings[:, 1::2, :] = action_embeddings[:, -length + int(targets is None):, :]
+        else:
+            token_embeddings = state_embeddings
+
+        all_pos_embeddings = torch.repeat_interleave(self.all_pos_embed, batch_size, dim=0)
+        position_embeddings = torch.gather(
+            all_pos_embeddings, 1, 
+            torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
+        ) 
+        position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
+
+        x = self.embedding_dropout(token_embeddings + position_embeddings)
+        x = self.blocks(x)
+        x = self.norm(x)
+        logits = self.fc(x)
+        logits = logits[:, 0::2, :] if actions is not None else logits
+        loss = None if targets is None else F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
+        return logits, loss
+        
