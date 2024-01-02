@@ -145,12 +145,3 @@ class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
             self._policy_improvement()
             policy_stable = self._policy_evaluation()
 
-
-## Probabilistic MDP Policy #######################################################################
-
-
-class ProbabilisticMDPPolicy(MDPPolicy):
-    
-    def __init__(self, model: mdp.MDP):
-        super().__init__(model)
-
