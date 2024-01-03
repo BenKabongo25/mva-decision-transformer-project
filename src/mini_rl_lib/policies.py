@@ -5,6 +5,7 @@
 # M2 MVA, ENS Paris-Saclay
 
 
+import enums
 import mdp
 import numpy as np
 
@@ -49,7 +50,7 @@ class DeterministicMDPPolicy(MDPPolicy):
         def get_value(s, a, next_s):
             v = 0
 
-            if self.model.config.reward_function_type is not mdp.MDPRewardType.SASR:
+            if self.model.config.reward_function_type is not enums.MDPRewardType.SASR:
                 r = self.model.reward_function(s, a, next_s, None)
                 v =  r + self.gamma * self._values[next_s]
                 
@@ -62,13 +63,13 @@ class DeterministicMDPPolicy(MDPPolicy):
 
         v = 0
 
-        if self.model.config.transition_function_type in (mdp.MDPTransitionType.S_DETERMINISTIC,
-                                                          mdp.MDPTransitionType.SA_DETERMINISTIC):
+        if self.model.config.transition_function_type in (enums.MDPTransitionTypeS_DETERMINISTIC,
+                                                          enums.MDPTransitionTypeSA_DETERMINISTIC):
             next_s = self.model.transition_function(s, a, None)
             v = get_value(s, a, next_s)
 
-        elif self.model.config.transition_function_type in (mdp.MDPTransitionType.S_PROBABILISTIC,
-                                                            mdp.MDPTransitionType.SA_PROBABILISTIC):
+        elif self.model.config.transition_function_type in (enums.MDPTransitionTypeS_PROBABILISTIC,
+                                                            enums.MDPTransitionTypeSA_PROBABILISTIC):
             next_s_probs = self.model.transition_function(s, a, None)
             for next_s, p_s in next_s_probs.items():
                 v += p_s * get_value(s, a, next_s)
@@ -100,6 +101,9 @@ class ValueIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
                 self._values[s] = np.max(values)
                 self._policy[s] = np.argmax(values)
                 delta = max(delta, np.abs(v - self._values[s]))
+
+
+VI = ValueIterationDeterministicMDPPolicy
 
 
 class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
@@ -145,3 +149,5 @@ class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
             self._policy_improvement()
             policy_stable = self._policy_evaluation()
 
+
+PI = PolicyIterationDeterministicMDPPolicy

@@ -166,7 +166,7 @@ class DiscreteActionMultiDiscreteWrapper(gym.ActionWrapper, DiscreteMultiDiscret
         return self.get(action)
 
 
-class DiscreteObservationDiscreteWrapper(gym.ObservationWrapper, DiscreteMultiDiscreteWrapper):
+class DiscreteObservationMultiDiscreteWrapper(gym.ObservationWrapper, DiscreteMultiDiscreteWrapper):
 
     def __init__(self, env: gym.Env, ns: Union[tuple, list, np.array]):
         gym.ObservationWrapper.__init__(self, env)

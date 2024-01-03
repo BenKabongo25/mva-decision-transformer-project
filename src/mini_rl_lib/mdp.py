@@ -11,26 +11,7 @@ import gym.spaces
 import numpy as np
 from typing import Any, Callable, Tuple, Union
 from wrappers import DiscreteWrapper
-
-
-class SpaceType(enum.Enum):
-    DISCRETE   = 0
-    CONTINUOUS = 1
-
-
-class MDPTransitionType(enum.Enum):
-    S_DETERMINISTIC = 0
-    S_PROBABILISTIC = 1
-    SA_DETERMINISTIC = 2
-    SA_PROBABILISTIC = 3
-    SAS = 4
-
-
-class MDPRewardType(enum.Enum):
-    S = 0
-    SA = 1
-    SAS = 2
-    SASR = 3
+from enums import *
 
 
 class MDPConfig(object):
@@ -120,7 +101,7 @@ class MarkovDecisionProcess(gym.Env):
             assert self.all_rewards is not None
 
 
-    def transition_function(self, s: Any, a: Any=None, next_s: Any=None) -> Union[int, float, dict]:
+    def transition_function(self, s: int, a: int=None, next_s: int=None) -> Union[int, float, dict]:
         """
         Transition function between states
         :param s: current state
@@ -177,7 +158,7 @@ class MarkovDecisionProcess(gym.Env):
         return next_s_prob
 
 
-    def reward_function(self, s: Any, a: Any=None, next_s: Any=None, r: float=None) -> float:
+    def reward_function(self, s: int, a: int=None, next_s: int=None, r: float=None) -> float:
         """
         Reward function
         :param s: current state
@@ -207,7 +188,7 @@ class MarkovDecisionProcess(gym.Env):
         return r_or_prob
 
 
-    def reset(self, seed: int = None, options: dict = None) -> Tuple[int, dict]:
+    def reset(self, seed: int=None, options: dict=None) -> Tuple[int, dict]:
         super().reset(seed=seed, options=options)
         observation = self._current_state
         info = {}
