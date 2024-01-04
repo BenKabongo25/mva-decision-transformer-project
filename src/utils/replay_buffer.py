@@ -108,7 +108,8 @@ class FixedReplayBuffer(object):
   def _get_checkpoint_suffixes(self, replay_file_start_index,
                                replay_file_end_index):
     """Get replay buffer indices to be be sampled among all replay buffers."""
-    ckpts = gfile.ListDirectory(self._data_dir)  # pytype: disable=attribute-error
+    ckpts = gfile.ListDirectory(
+        self._data_dir)  # pytype: disable=attribute-error
     # Assumes that the checkpoints are saved in a format CKPT_NAME.{SUFFIX}.gz
     ckpt_counters = collections.Counter(
         [name.split('.')[-2] for name in ckpts if name.endswith('gz')])
@@ -136,7 +137,7 @@ class FixedReplayBuffer(object):
       self._replay_buffers = []
       # Load the replay buffers in parallel
       with futures.ThreadPoolExecutor(
-          max_workers=num_buffers) as thread_pool_executor:
+              max_workers=num_buffers) as thread_pool_executor:
         replay_futures = [thread_pool_executor.submit(
             self._load_buffer, suffix) for suffix in ckpt_suffixes]
       for f in replay_futures:
