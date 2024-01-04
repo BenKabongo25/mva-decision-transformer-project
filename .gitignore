@@ -2,11 +2,5 @@ google-cloud-sdk/
 src/data/atari/Breakout/
 tests_ignore/
 src_ignore/
-.DS_Store
 .gitignore
-src/.DS_Store
-src/data/.DS_Store
-src/datasets/.DS_Store
-src/mini_rl_lib/.DS_Store
-src/models/.DS_Store
-src/utils/.DS_Store
+**/.DS_Store
