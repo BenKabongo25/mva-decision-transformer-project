@@ -19,9 +19,6 @@ class MDPPolicy(object):
         raise NotImplementedError
 
 
-## Deterministic MDP Policy #######################################################################
-
-
 class DeterministicMDPPolicy(MDPPolicy):
     
     def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
@@ -82,7 +79,7 @@ class DeterministicMDPPolicy(MDPPolicy):
         return v
 
 
-class ValueIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
+class ValueIteration(DeterministicMDPPolicy):
 
     def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
         super().__init__(model, gamma, eps)
@@ -103,10 +100,10 @@ class ValueIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
                 delta = max(delta, np.abs(v - self._values[s]))
 
 
-VI = ValueIterationDeterministicMDPPolicy
+VI = ValueIteration
 
 
-class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
+class PolicyIteration(DeterministicMDPPolicy):
 
     def __init__(self, model: mdp.MDP, gamma: float=1e-3, eps: float=1e-3):
         super().__init__(model, gamma, eps)
@@ -150,4 +147,4 @@ class PolicyIterationDeterministicMDPPolicy(DeterministicMDPPolicy):
             policy_stable = self._policy_evaluation()
 
 
-PI = PolicyIterationDeterministicMDPPolicy
+PI = PolicyIteration

@@ -214,24 +214,25 @@ class MarkovDecisionProcess(gym.Env):
             next_s = self.np_random.choice(next_ss, p=probs)
             
         else:
-            next_ss = np.arange(self.config.n_states)
-            probs = np.zeros_like(next_ss)
-            for next_s in next_ss:
+            probs = []
+            for next_s in range(self.config.n_states):
                 p_s = self.transition_function(s, a, next_s)
-                probs[next_s] = p_s
+                probs.append(p_s)
+            probs = np.array(probs)
             if probs.sum() == 0:
-                return next_s, r, terminated, True, {"Error": "Probabilities sum to zero"}
+                return None, r, terminated, True, {"Error": "Probabilities sum to zero"}
             probs = probs / probs.sum()
-            next_s = self.np_random.choice(next_ss, p=probs)
+            next_s = self.np_random.choice(np.arange(self.config.n_states), p=probs)
 
         if self.config.reward_function_type is not MDPRewardType.SASR:
             r = self.reward_function(s, a, next_s, None)
                 
         else:
-            probs = np.zeros_like(self.all_rewards)
-            for i, r in enumerate(self.all_rewards):
+            probs = []
+            for r in self.all_rewards:
                 p_r = self.reward_function(s, a, next_s, r)
-                probs[i] = p_r
+                probs.append(p_r)
+            probs = np.array(probs)
             if probs.sum() == 0:
                 return next_s, r, terminated, True, {"Error": "Probabilities sum to zero"}
             probs = probs / probs.sum()
