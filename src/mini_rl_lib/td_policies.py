@@ -65,7 +65,7 @@ class QLearning(TDPolicy):
 
 class DoubleQLearning(TDPolicy):
 
-    def __init__(self, model: mdp.MDP, alpha: float, gamma: float = 0.99, eps: float = 0.001):
+    def __init__(self, model: mdp.MDP, alpha: float, gamma: float=0.99, eps: float=1e-3):
         super().__init__(model, alpha, gamma, eps)
         self.Q_ = np.zeros((self.model.config.n_states, self.model.config.n_actions))
 
