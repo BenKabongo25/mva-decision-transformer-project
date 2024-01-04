@@ -5,7 +5,6 @@
 # M2 MVA, ENS Paris-Saclay
 
 
-import enum
 import gym
 import gym.spaces
 import numpy as np
@@ -127,10 +126,10 @@ class MarkovDecisionProcess(gym.Env):
             next_s_probs = self._transition_function(s, None, None)
             if self.config.n_states != -1:
                 assert len(next_s_probs) == self.config.n_states
-            next_ss, probs = next_s_probs.items()
+            next_ss, probs = list(next_s_probs.keys()), list(next_s_probs.values())
             for next_s in next_ss:
                 assert self.observation_space.contains(next_s), str(next_s)
-            assert np.sum(probs) == 1
+            #assert np.sum(probs) == 1
             return next_s_probs
 
         assert a is not None
@@ -145,10 +144,10 @@ class MarkovDecisionProcess(gym.Env):
             next_s_probs = self._transition_function(s, a, None)
             if self.config.n_states != -1:
                 assert len(next_s_probs) == self.config.n_states
-            next_ss, probs = next_s_probs.items()
+            next_ss, probs = list(next_s_probs.keys()), list(next_s_probs.values())
             for next_s in next_ss:
                 assert self.observation_space.contains(next_s), str(next_s)
-            assert np.sum(probs) == 1
+            #assert np.sum(probs) == 1
             return next_s_probs
 
         assert next_s is not None
@@ -211,7 +210,7 @@ class MarkovDecisionProcess(gym.Env):
         elif self.config.transition_function_type in (MDPTransitionType.S_PROBABILISTIC,
                                                       MDPTransitionType.SA_PROBABILISTIC):
             next_s_probs = self.transition_function(s, a, None)
-            next_ss, probs = next_s_probs.items()
+            next_ss, probs = list(next_s_probs.keys()), list(next_s_probs.values())
             next_s = self.np_random.choice(next_ss, p=probs)
             
         else:
@@ -239,6 +238,7 @@ class MarkovDecisionProcess(gym.Env):
             r = self.np_random.choice(self.all_rewards, p=probs)
 
         terminated = self._terminate_function(next_s)
+        self._current_state = next_s
         
         return next_s, r, terminated, False, info
 

@@ -63,13 +63,13 @@ class DeterministicMDPPolicy(MDPPolicy):
 
         v = 0
 
-        if self.model.config.transition_function_type in (enums.MDPTransitionTypeS_DETERMINISTIC,
-                                                          enums.MDPTransitionTypeSA_DETERMINISTIC):
+        if self.model.config.transition_function_type in (enums.MDPTransitionType.S_DETERMINISTIC,
+                                                          enums.MDPTransitionType.SA_DETERMINISTIC):
             next_s = self.model.transition_function(s, a, None)
             v = get_value(s, a, next_s)
 
-        elif self.model.config.transition_function_type in (enums.MDPTransitionTypeS_PROBABILISTIC,
-                                                            enums.MDPTransitionTypeSA_PROBABILISTIC):
+        elif self.model.config.transition_function_type in (enums.MDPTransitionType.S_PROBABILISTIC,
+                                                            enums.MDPTransitionType.SA_PROBABILISTIC):
             next_s_probs = self.model.transition_function(s, a, None)
             for next_s, p_s in next_s_probs.items():
                 v += p_s * get_value(s, a, next_s)

@@ -23,7 +23,12 @@ def terminate_s(n_states, p=0.1, exclude_start=True):
 ## Transitions functions ##########################################################################
 
 def transition_s_deterministic(n_states):
-    return np.random.randint(low=0, high=n_states, size=n_states)
+    transitions = np.zeros(n_states, dtype=int)
+    for s in range(n_states):
+        other_s = list(range(n_states))
+        del other_s[s]
+        transitions[s] = np.random.choice(other_s)
+    return transitions
 
 
 def transition_s_probabilistic(n_states, high=10):
