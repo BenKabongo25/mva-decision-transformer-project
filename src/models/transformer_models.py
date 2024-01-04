@@ -1,8 +1,9 @@
 # Deep Learning
-# December 2023
+# January 2024
 #
 # Ben Kabongo
 # M2 MVA, ENS Paris-Saclay
+
 
 import torch
 import torch.nn as nn
@@ -88,6 +89,7 @@ class TransformerBlock(nn.Module):
 class TransformerModel(nn.Module):
 
     def __init__(self,
+                n_states,
                 n_actions,
                 max_length,
                 max_t,
@@ -101,6 +103,7 @@ class TransformerModel(nn.Module):
                 ):
         super().__init__()
 
+        self.n_states = n_states
         self.n_actions = n_actions
         self.max_length = max_length
         self.max_t = max_t
@@ -108,10 +111,7 @@ class TransformerModel(nn.Module):
         self.n_blocks = n_blocks
         self.embedding_dim = embedding_dim
         self.device = device
-        
-        self.token_embed = nn.Embedding(num_embeddings=n_actions, embedding_dim=embedding_dim, device=device)
-        self.pos_embed = nn.Parameter(torch.zeros((1, max_length, embedding_dim), device=device))
-        self.all_pos_embed = nn.Parameter(torch.zeros((1, max_t, embedding_dim), device=device))
+
         self.embedding_dropout = nn.Dropout(p=embedding_pdropout)
         self.blocks = nn.Sequential(*[
             TransformerBlock(embedding_dim, n_heads, attention_pdropout, output_pdropout, max_length) 
@@ -120,17 +120,8 @@ class TransformerModel(nn.Module):
         self.norm = nn.LayerNorm(embedding_dim)
         self.fc = nn.Linear(embedding_dim, n_actions)
 
-        self.apply(self._init_weights)
-
-        self.state_encoder = nn.Sequential(
-            nn.Conv2d(4, 32, 8, stride=4, padding=0), 
-            nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2, padding=0), 
-            nn.ReLU(),
-            nn.Conv2d(64, 64, 3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.Flatten(), 
-            nn.Linear(3136, embedding_dim), 
+        self.state_embed = nn.Sequential(
+            nn.Embedding(num_embeddings=n_actions, embedding_dim=embedding_dim),
             nn.Tanh()
         ).to(device=device)
 
@@ -143,7 +134,11 @@ class TransformerModel(nn.Module):
             nn.Embedding(num_embeddings=n_actions, embedding_dim=embedding_dim), 
             nn.Tanh()
         ).to(device=device)
-        nn.init.normal_(self.action_embed[0].weight, mean=0.0, std=0.02)
+
+        self.pos_embed = nn.Parameter(torch.zeros((1, max_length, embedding_dim), device=device))
+        self.all_pos_embed = nn.Parameter(torch.zeros((1, max_t, embedding_dim), device=device))
+        
+        self.apply(self._init_weights)
 
 
     def _init_weights(self, module):
@@ -160,71 +155,31 @@ class TransformerModel(nn.Module):
         raise NotImplementedError
 
 
-    def configure_optimizers(self, lr, weight_decay, betas):
-        decay = set()
-        no_decay = set()
-        whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv2d)
-        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
-        for mn, m in self.named_modules():
-            for pn, p in m.named_parameters():
-                fpn = '%s.%s' % (mn, pn) if mn else pn
-                if pn.endswith('bias'):
-                    no_decay.add(fpn)
-                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
-                    decay.add(fpn)
-                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
-                    no_decay.add(fpn)
-
-        no_decay.add('pos_embed')
-        no_decay.add('all_pos_embed')
-
-        param_dict = {pn: p for pn, p in self.named_parameters()}
-        inter_params = decay & no_decay
-        union_params = decay | no_decay
-        assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params), )
-        assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" \
-                                                    % (str(param_dict.keys() - union_params), )
-
-        optim_groups = [
-            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": weight_decay},
-            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
-        ]
-        optimizer = torch.optim.AdamW(optim_groups, lr=lr, betas=betas)
-        return optimizer
-
-
 class DecisionTransformer(TransformerModel):
 
     def forward(self, states, actions=None, targets=None, rtgs=None, timesteps=None):
         batch_size, length, _ = states.size()
 
-        state_embeddings = self.state_encoder(
-            states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()
-            ).reshape(batch_size, length, self.embedding_dim)
+        state_embeddings = self.state_embed(states.type(torch.long).squeeze(-1))
+        pos_embeddings = self.pos_embed[:, :length, :]
         
         if actions is not None: 
             action_embeddings = self.action_embed(actions.type(torch.long).squeeze(-1))
             rtg_embeddings = self.return_embed(rtgs.type(torch.float32))
             token_embeddings = torch.zeros((batch_size, length * 3 - int(targets is None), self.embedding_dim), 
                                             dtype=torch.float32, device=self.device)
-            token_embeddings[:, 0::3, :] = rtg_embeddings
-            token_embeddings[:, 1::3, :] = state_embeddings
-            token_embeddings[:, 2::3, :] = action_embeddings[:, -length + int(targets is None):, :]
+            token_embeddings[:, 0::3, :] = rtg_embeddings + pos_embeddings
+            token_embeddings[:, 1::3, :] = state_embeddings + pos_embeddings
+            token_embeddings[:, 2::3, :] = action_embeddings[:, -length + int(targets is None):, :] + pos_embeddings
 
         else:
-            rtg_embeddings = self.return_embed(rtgs.type(torch.float32))
+            rtg_embeddings = self.return_embed(rtgs.type(torch.float32)) 
             token_embeddings = torch.zeros((batch_size, length * 2, self.embedding_dim), 
                                             dtype=torch.float32, device=self.device)
-            token_embeddings[:, 0::2, :] = rtg_embeddings
-            token_embeddings[:, 1::2, :] = state_embeddings
+            token_embeddings[:, 0::2, :] = rtg_embeddings + pos_embeddings
+            token_embeddings[:, 1::2, :] = state_embeddings + pos_embeddings
 
-        all_pos_embeddings = torch.repeat_interleave(self.all_pos_embed, batch_size, dim=0)
-        position_embeddings = torch.gather(
-            all_pos_embeddings, 1, 
-            torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
-        ) 
-        print(position_embeddings.size())
-        position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
+        position_embeddings = self.all_pos_embed[:, :token_embeddings.shape[1], :]
 
         x = self.embedding_dropout(token_embeddings + position_embeddings)
         x = self.blocks(x)
@@ -240,26 +195,19 @@ class BehaviorCloning(TransformerModel):
     def forward(self, states, actions=None, targets=None, rtgs=None, timesteps=None):
         batch_size, length, _ = states.size()
 
-        state_embeddings = self.state_encoder(
-            states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()
-            ).reshape(batch_size, length, self.embedding_dim)
+        state_embeddings = self.state_embed(states.type(torch.long).squeeze(-1))
+        pos_embeddings = self.pos_embed[:, :length, :]
 
         if actions is not None:
             action_embeddings = self.action_embed(actions.type(torch.long).squeeze(-1))
             token_embeddings = torch.zeros((batch_size, length * 2 - int(targets is None), self.embedding_dim), 
                                             dtype=torch.float32, device=self.device)
-            token_embeddings[:, 0::2, :] = state_embeddings
-            token_embeddings[:, 1::2, :] = action_embeddings[:, -length + int(targets is None):, :]
+            token_embeddings[:, 0::2, :] = state_embeddings + pos_embeddings
+            token_embeddings[:, 1::2, :] = action_embeddings[:, -length + int(targets is None):, :] + pos_embeddings
         else:
-            token_embeddings = state_embeddings
+            token_embeddings = state_embeddings + pos_embeddings
 
-        all_pos_embeddings = torch.repeat_interleave(self.all_pos_embed, batch_size, dim=0)
-        position_embeddings = torch.gather(
-            all_pos_embeddings, 1, 
-            torch.repeat_interleave(timesteps, self.embedding_dim, dim=-1)
-        )
-        position_embeddings += self.pos_embed[:, :token_embeddings.shape[1], :]
-
+        position_embeddings = self.all_pos_embed[:, :token_embeddings.shape[1], :]
         x = self.embedding_dropout(token_embeddings + position_embeddings)
         x = self.blocks(x)
         x = self.norm(x)
