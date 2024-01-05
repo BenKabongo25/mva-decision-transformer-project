@@ -1,5 +1,4 @@
-google-cloud-sdk/
-src/data/atari/Breakout/
+src/data/mdp/
 tests_ignore/
 src_ignore/
 .gitignore

@@ -15,7 +15,7 @@ class MDPPolicy(object):
     def __init__(self, model: mdp.MDP):
         self.model = model
 
-    def fit(self):
+    def fit(self, **args):
         raise NotImplementedError
 
 
@@ -85,7 +85,7 @@ class ValueIteration(DeterministicMDPPolicy):
         super().__init__(model, gamma, eps)
 
 
-    def fit(self):
+    def fit(self, **args):
         delta = self.eps + 1
         while delta > self.eps:
             delta = 0
@@ -140,7 +140,7 @@ class PolicyIteration(DeterministicMDPPolicy):
         return policy_stable
 
 
-    def fit(self):
+    def fit(self, **args):
         policy_stable = False
         while not policy_stable:
             self._policy_improvement()
