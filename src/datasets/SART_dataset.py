@@ -11,30 +11,36 @@ import torch
 
 class SARTDataset(torch.utils.data.Dataset):
 
-    def __init__(self, data, max_length, actions, done_idxs, rtgs, timesteps):        
+    def __init__(self, data, max_length, n_states, n_actions):        
         self.max_length = max_length
-        self.n_actions = max(actions) + 1
-        self.data = data
-        self.actions = actions
-        self.done_idxs = done_idxs
-        self.rtgs = rtgs
-        self.timesteps = timesteps
+        self.n_states = n_states
+        self.n_actions = n_actions
+        self.data = []
+        self.done_idxs = []
+        for (states, actions, rewards, times) in data:
+            if len(states) > max_length:
+                rtgs = (np.cumsum(rewards[::-1])[::-1]).tolist()
+                item = [states, actions, rtgs, times]
+                self.data.append(item)
+                self.done_idxs.append(len(states) - max_length)
+        self.done_idxs = np.cumsum(self.done_idxs)
     
+
     def __len__(self):
-        return len(self.data) - self.max_length
+        return self.done_idxs[-1]
+        
 
     def __getitem__(self, idx):
-        block_size = self.block_size // 3
-        done_idx = idx + block_size
-        for i in self.done_idxs:
-            if i > idx: # first done_idx greater than idx
-                done_idx = min(int(i), done_idx)
+        item_idx = 0
+        for i, done_idx in enumerate(self.done_idxs):
+            if done_idx > idx:
+                item_idx = i
                 break
-        idx = done_idx - block_size
-        states = torch.tensor(np.array(self.data[idx:done_idx]), dtype=torch.float32).reshape(block_size, -1)
-        states = states / 255.
-        actions = torch.tensor(self.actions[idx:done_idx], dtype=torch.long).unsqueeze(1)
-        rtgs = torch.tensor(self.rtgs[idx:done_idx], dtype=torch.float32).unsqueeze(1)
-        timesteps = torch.tensor(self.timesteps[idx:idx+1], dtype=torch.int64).unsqueeze(1)
-
-        return states, actions, rtgs, timesteps
+        idx = self.done_idxs[item_idx] - idx
+        states  = self.data[item_idx][0][idx: idx + self.max_length]
+        actions = self.data[item_idx][1][idx: idx + self.max_length]
+        targets = self.data[item_idx][1][idx + self.max_length]
+        rtgs    = self.data[item_idx][2][idx: idx + self.max_length]
+        times   = self.data[item_idx][3][idx: idx + self.max_length]
+        return (states, actions, rtgs, times), targets
+        
