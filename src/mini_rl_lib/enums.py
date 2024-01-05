@@ -26,3 +26,11 @@ class MDPRewardType(enum.Enum):
     SAS  = 2
     SASR = 3
     
+
+class PolicyType(enum.Enum):
+    VI = 0
+    PI = 1
+    SARSA = 2
+    QLEARNING = 3
+    DQLEARNING = 4
+    

@@ -7,9 +7,10 @@
 
 import numpy as np
 
-from enums import MDPTransitionType, MDPRewardType, SpaceType
+from enums import MDPTransitionType, MDPRewardType, SpaceType, PolicyType
 from mdp import MDP, MDPConfig
-from policies import VI
+from policies import VI, PI
+from td_policies import SARSA, QLearning, DoubleQLearning
 from utils import terminate_s, transition, reward
 from wrappers import DiscreteActionWrapper, DiscreteObservationWrapper, Range
 
@@ -18,7 +19,8 @@ class MDPFactory(object):
 
     def __init__(self, transition_function_type, reward_function_type, 
                 n_states, n_actions, n_rewards, 
-                p=0.2, gamma=0.99, eps=1e-3
+                p=0.2, gamma=0.99, eps=1e-3, alpha=1e-3,
+                policy_type=PolicyType.VI
         ):
         config = MDPConfig(
             state_space_type=SpaceType.DISCRETE,
@@ -58,6 +60,8 @@ class MDPFactory(object):
             if transition_function_type is MDPTransitionType.SAS:
                 return self.transitions[s, a, next_s]
 
+            raise ValueError("Unknown transition type")
+
         def reward_function(s, a, next_s, r):
             if reward_function_type is MDPRewardType.S:
                 return self.rewards[s]
@@ -72,6 +76,8 @@ class MDPFactory(object):
                 i = list(all_rewards).index(r)
                 return self.rewards[s, a, next_s, i]
             
+            raise ValueError("Unknown reward type")
+            
         observation_wrapper = DiscreteObservationWrapper(self.model, Range(n_states))
         action_wrapper = DiscreteActionWrapper(self.model, Range(n_actions))
 
@@ -84,11 +90,22 @@ class MDPFactory(object):
             all_rewards
         )
 
-        self.policy = VI(self.model, gamma, eps)
+        if policy_type is PolicyType.VI:
+            self.policy = VI(self.model, gamma, eps)
+        elif policy_type is PolicyType.PI:
+            self.policy = PI(self.model, gamma, eps)
+        elif policy_type is PolicyType.SARSA:
+            self.policy = SARSA(self.model, alpha, gamma, eps)
+        elif policy_type is PolicyType.QLEARNING:
+            self.policy = QLearning(self.model, alpha, gamma, eps)
+        elif policy_type is PolicyType.DQLEARNING:
+            self.policy = DoubleQLearning(self.model, alpha, gamma, eps)
+        else:
+            raise ValueError("Unknown policy type")
 
 
-    def train_policy(self):
-        self.policy.fit()
+    def train_policy(self, **args):
+        self.policy.fit(**args)
 
 
     def get_policy(self):
@@ -98,9 +115,10 @@ class MDPFactory(object):
     def play(self, n_steps=100, verbose=True):
         observation, info = self.model.reset(seed=42)
         print(". =>", observation, None, False, False, info)
+        policy = self.policy.get_policy()
 
         for _ in range(n_steps):
-            action = self.policy._policy[observation]
+            action = policy[observation]
             observation, reward, terminated, truncated, info = self.model.step(action)
             if verbose:
                 print(action, "=>", observation, reward, terminated, truncated, info)

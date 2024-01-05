@@ -33,6 +33,10 @@ class TDPolicy(MDPPolicy):
         return a
 
 
+    def get_policy(self):
+        return np.argmax(self.Q, axis=1)
+
+
 class SARSA(TDPolicy):
 
     def fit(self, n_episodes=100):
@@ -95,3 +99,5 @@ class DoubleQLearning(TDPolicy):
         return a
 
     
+    def get_policy(self):
+        return np.argmax(self.Q + self.Q_, axis=1)
