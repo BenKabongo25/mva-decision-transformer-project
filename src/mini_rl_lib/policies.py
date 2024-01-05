@@ -5,9 +5,10 @@
 # M2 MVA, ENS Paris-Saclay
 
 
-import enums
-import mdp
 import numpy as np
+
+from . import enums
+from . import mdp
 
 
 class MDPPolicy(object):

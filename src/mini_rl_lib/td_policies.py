@@ -7,8 +7,8 @@
 
 import numpy as np
 
-import mdp
-from policies import MDPPolicy
+from . import mdp
+from .policies import MDPPolicy
 
 
 class TDPolicy(MDPPolicy):

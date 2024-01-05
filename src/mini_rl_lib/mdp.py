@@ -9,8 +9,9 @@ import gym
 import gym.spaces
 import numpy as np
 from typing import Any, Callable, Tuple, Union
-from wrappers import DiscreteWrapper
-from enums import *
+
+from .enums import *
+from .wrappers import DiscreteWrapper
 
 
 class MDPConfig(object):

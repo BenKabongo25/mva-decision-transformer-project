@@ -6,7 +6,8 @@
 
 
 import numpy as np
-from enums import MDPTransitionType, MDPRewardType
+
+from .enums import MDPTransitionType, MDPRewardType
 
 
 ## Terminate functions ############################################################################

@@ -1,0 +1,1 @@
+{"n_states": 10, "n_actions": 2, "n_rewards": 3, "target_return": 0.0, "data_min_step": 2, "data_max_step": 2, "terminate_state_p": 1e-08, "random_play_p": 0, "n_replay": 10000}

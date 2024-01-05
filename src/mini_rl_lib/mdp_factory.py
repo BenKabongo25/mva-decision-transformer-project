@@ -8,12 +8,12 @@ import json
 import numpy as np
 from collections import namedtuple
 
-from enums import MDPTransitionType, MDPRewardType, SpaceType, PolicyType
-from mdp import MDP, MDPConfig
-from policies import VI, PI
-from td_policies import SARSA, QLearning, DoubleQLearning
-from utils import terminate_s, transition, reward
-from wrappers import DiscreteActionWrapper, DiscreteObservationWrapper, Range
+from .enums import MDPTransitionType, MDPRewardType, SpaceType, PolicyType
+from .mdp import MDP, MDPConfig
+from .policies import VI, PI
+from .td_policies import SARSA, QLearning, DoubleQLearning
+from .utils import terminate_s, transition, reward
+from .wrappers import DiscreteActionWrapper, DiscreteObservationWrapper, Range
 
 
 class MDPFactory(object):
@@ -228,6 +228,7 @@ class MDPFactory(object):
         if verbose:
             print(". =>", observation, None, False, False, info)
 
+        observation = self.model._current_state
         policy = self.policy.get_policy()
         for _ in range(n_steps):
             action = policy[observation]

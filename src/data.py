@@ -8,10 +8,12 @@
 import json
 import numpy as np
 import os
+import warnings
 from tqdm import tqdm
+warnings.filterwarnings(action="ignore")
 
-from mdp_factory import MDPFactory
-from enums import MDPTransitionType, MDPRewardType, PolicyType
+from mini_rl_lib.mdp_factory import MDPFactory
+from mini_rl_lib.enums import MDPTransitionType, MDPRewardType, PolicyType
 
 
 def create(
@@ -31,7 +33,7 @@ def create(
     random_play_p=0.1,
     seed=42,
     verbose=True,
-    base_dir="Project/mva-Decision-Transformer-project/src/data/mdp",
+    base_dir=".",
     data_dir_name=None
 ):
 
@@ -72,7 +74,9 @@ def create(
         if terminated or truncated:
             break
 
-    min_step = max_step
+    data_min_step = max_step
+    data_max_step = 0
+
     data = []
     for i in range(n_replay):
         states  = []
@@ -81,6 +85,7 @@ def create(
         times   = []
 
         state, info = factory.model.reset(seed=seed)
+        state = factory.model._current_state
         if verbose:
             print(f"\n{'='*100}\nPlay {i}")
             print(". =>", state, None, False, False, info)
@@ -93,18 +98,21 @@ def create(
             else:
                 action = policy[state]   
             next_state, reward, terminated, truncated, info = factory.model.step(action)
-            if verbose:
-                print(f"[{player}]", action, "=>", next_state, reward, terminated, truncated, info)
-            if terminated or truncated:
-                break
             states.append(int(state))
             actions.append(int(action))
             rewards.append(float(reward))
             times.append(int(t))
             state = next_state
+
+            if verbose:
+                print(f"[{player}]", action, "=>", next_state, reward, terminated, truncated, info)
+            if terminated or truncated:
+                break
         
-        if t < min_step:
-            min_step = t
+        if t < data_min_step:
+            data_min_step = t
+        if t > data_max_step:
+            data_max_step = t
 
         item = [states, actions, rewards, times]
         data.append(item)
@@ -114,9 +122,11 @@ def create(
         "n_actions": n_actions,
         "n_rewards": n_rewards,
         "target_return": target_return,
-        "min_step": min_step,
+        "data_min_step": data_min_step,
+        "data_max_step": data_max_step,
         "terminate_state_p": p,
-        "random_play_p": random_play_p
+        "random_play_p": random_play_p,
+        "n_replay": n_replay
     }
 
     factory.save(data_dir + "model.json")
@@ -137,11 +147,17 @@ def load(data_dir):
 
 if __name__ == "__main__":
     for n_states in tqdm([10, 100, 1_000, 10_000, 10_000, 100_000, 1_000_000], "S"):
-        for n_actions in tqdm([2, 3, 4, 5, 10, 20, 50], "A"):
-            for n_rewards in tqdm([2, 3, 4, 5, 10], "R"):
+        print("States :", n_states)
+        for n_actions in [2, 3, 4, 5, 10, 20, 50, 100]:
+            print("Actions :", n_actions)
+            for n_rewards in [2, 3, 4, 5, 10]:
                 create(n_states, n_actions, n_rewards, 
-                        p=0.1, n_replay=10_000, max_step=1_000, 
-                        random_play_p=min(0.4, (1-(n_states/1_000_000))), verbose=False)
-                print()
-            print()
-        print()
+                        p=(n_states/1_000_000_000), n_replay=10_000, max_step=1_000, 
+                        random_play_p=0, verbose=False,
+                        base_dir="Project/mva-Decision-Transformer-project/data/mdp/policy",
+                )
+                create(n_states, n_actions, n_rewards, 
+                        p=(n_states/1_000_000_000), n_replay=10_000, max_step=1_000, 
+                        random_play_p=0.5, verbose=False,
+                        base_dir="Project/mva-Decision-Transformer-project/data/mdp/random",
+                )
