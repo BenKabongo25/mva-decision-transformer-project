@@ -1,4 +1,4 @@
-src/data/mdp/
+data/mdp/
 tests_ignore/
 src_ignore/
 .gitignore

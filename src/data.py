@@ -153,11 +153,6 @@ if __name__ == "__main__":
             for n_rewards in [2, 3, 4, 5, 10]:
                 create(n_states, n_actions, n_rewards, 
                         p=(n_states/1_000_000_000), n_replay=10_000, max_step=1_000, 
-                        random_play_p=0, verbose=False,
-                        base_dir="Project/mva-Decision-Transformer-project/data/mdp/policy",
-                )
-                create(n_states, n_actions, n_rewards, 
-                        p=(n_states/1_000_000_000), n_replay=10_000, max_step=1_000, 
                         random_play_p=0.5, verbose=False,
-                        base_dir="Project/mva-Decision-Transformer-project/data/mdp/random",
+                        base_dir="Project/mva-Decision-Transformer-project/data/mdp",
                 )
