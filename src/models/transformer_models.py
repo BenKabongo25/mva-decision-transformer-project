@@ -131,7 +131,7 @@ class TransformerModel(nn.Module):
         ).to(device=device)
 
         self.time_embed = nn.Sequential(
-            nn.Embedding(num_embeddings=max_t + 1, embedding_dim=embedding_dim), 
+            nn.Linear(1, embedding_dim), 
             nn.Tanh()
         ).to(device=device)
 
@@ -186,7 +186,7 @@ class DecisionTransformer(TransformerModel):
 
     def forward(self, states, actions, rtgs, timesteps=None):
         batch_size, length  = states.size()
-        pos_embeddings = self.time_embed(timesteps)
+        pos_embeddings = self.time_embed(timesteps.unsqueeze(-1))
         state_embeddings = self.state_embed(states)
         action_embeddings = self.action_embed(actions)
         rtg_embeddings = self.return_embed(rtgs.unsqueeze(-1))
@@ -208,7 +208,7 @@ class BehaviorCloning(TransformerModel):
 
     def forward(self, states, actions, rtgs=None, timesteps=None):
         batch_size, length, _ = states.size()
-        pos_embeddings = self.time_embed(timesteps)
+        pos_embeddings = self.time_embed(timesteps.unsqueeze(-1))
         state_embeddings = self.state_embed(states)
         action_embeddings = self.action_embed(actions)
         input_embeddings = torch.zeros((batch_size, 2 * length, self.embedding_dim), 
