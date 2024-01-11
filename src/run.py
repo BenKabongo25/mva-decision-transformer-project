@@ -191,7 +191,7 @@ def run(config):
                                     device=device)
         optimizer = model.configure_optimizers(lr=config.lr, weight_decay=config.weight_decay, betas=config.betas)
 
-    all_loss = train(model, dataloader, optimizer, num_epochs=config.num_epochs)
+    all_loss = train(model, dataloader, optimizer, config)
     os.makedirs(config.plot_dir, exist_ok=True)
     plt.plot(all_loss)
     plt.savefig(config.plot_dir + f"/{config.experiment_name}_loss.png")
@@ -207,18 +207,18 @@ def run(config):
 def main():
     base_dir = "../data/mdp"
     res_dir = "../results"
-    os.makedirs(res_dir)
+    os.makedirs(res_dir, exist_ok=True)
 
     results = {}
 
-    for model_name in tqdm(( ModelName.DECISION_TRANSFORMER,
+    for model in tqdm(( ModelName.DECISION_TRANSFORMER,
                         ModelName.BEHAVIOR_CLOSING,
                         ModelName.RNN4RL ), "Model"):
 
-        model_name = model_name.name
+        model_name = model.name
         results[model_name] = {}
 
-        if model_name is ModelName.BEHAVIOR_CLOSING: # rtg/reward indifferent
+        if model is ModelName.BEHAVIOR_CLOSING: # rtg/reward indifferent
             rtgs = (True,)
         else:
             rtgs = (True, False)
@@ -240,12 +240,8 @@ def main():
 
                         experiment_name = f"{model_name}_{rtg_name}_{s_name}_{a_name}_{r_name}"
                         data_dir_name = f"S{n_states}_A{n_actions}_R{n_rewards}_T2_R1"
-                        if not os.path.exists(data_dir_name):
-                            print(f"Not found : {data_dir_name}")
-                            continue
-
                         data_dir = f"{base_dir}/{data_dir_name}/"
-                        config = Config(data_dir, model_name)
+                        config = Config(data_dir, model)
                         config.rtg = rtg
                         config.plot_dir = f"{res_dir}/plots"
                         config.experiment_name = experiment_name

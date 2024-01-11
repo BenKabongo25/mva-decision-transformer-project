@@ -207,7 +207,7 @@ class DecisionTransformer(TransformerModel):
 class BehaviorCloning(TransformerModel):
 
     def forward(self, states, actions, rtgs=None, timesteps=None):
-        batch_size, length, _ = states.size()
+        batch_size, length = states.size()
         pos_embeddings = self.time_embed(timesteps.unsqueeze(-1))
         state_embeddings = self.state_embed(states)
         action_embeddings = self.action_embed(actions)
