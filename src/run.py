@@ -165,7 +165,6 @@ def run(config):
     torch.manual_seed(config.seed)
 
     factory, metadata, data = load(config.data_dir)
-
     n_states = metadata["n_states"]
     n_actions = metadata["n_actions"]
     target_return = metadata["target_return"]
@@ -179,10 +178,18 @@ def run(config):
 
     if config.model_name is ModelName.RNN4RL:
         model = RNN4RL(n_states, n_actions, embedding_dim=config.embedding_dim, hidden_size=config.hidden_size, 
-                       project_size=config.project_size, embedding_pdropout=config.embedding_pdropout)
-    model = DecisionTransformer(n_states, n_actions, max_length=config.max_length, max_t=max_t, 
-                            n_heads=config.n_heads, n_blocks=config.n_blocks, embedding_dim=config.embedding_dim, device=device)
-    optimizer = model.configure_optimizers(lr=config.lr, weight_decay=config.weight_decay, betas=config.betas)
+                       project_size=config.project_size, embedding_pdropout=config.embedding_pdropout, device=device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay, betas=config.betas)
+    else:
+        if config.model_name is ModelName.DECISION_TRANSFORMER:
+            model = DecisionTransformer(n_states, n_actions, max_length=config.max_length, max_t=max_t, 
+                                        n_heads=config.n_heads, n_blocks=config.n_blocks, embedding_dim=config.embedding_dim, 
+                                        device=device)
+        else:
+            model = BehaviorCloning(n_states, n_actions, max_length=config.max_length, max_t=max_t, 
+                                    n_heads=config.n_heads, n_blocks=config.n_blocks, embedding_dim=config.embedding_dim, 
+                                    device=device)
+        optimizer = model.configure_optimizers(lr=config.lr, weight_decay=config.weight_decay, betas=config.betas)
 
     all_loss = train(model, dataloader, optimizer, num_epochs=config.num_epochs)
     os.makedirs(config.plot_dir, exist_ok=True)
