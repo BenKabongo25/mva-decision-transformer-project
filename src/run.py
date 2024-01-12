@@ -29,6 +29,7 @@ warnings.filterwarnings(action="ignore")
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("[Device]:", device)
 
 
 class ModelName(enum.Enum):
@@ -55,12 +56,12 @@ class Config:
         self.lr=6e-4
         self.weight_decay=0
         self.betas=(0.9, 0.95)
-        self.num_epochs=10
+        self.num_epochs=5
         self.seed=42
         self.max_step=1_000             # eval
         self.plot_dir="."               # 
         self.experiment_name="run"      #
-        self.verbose=False
+        self.verbose=True
         self.rtg=True                   # rtg or reward dataset
 
 
@@ -73,7 +74,7 @@ def train(model, dataloader, optimizer, config):
 
     progress_bar = range(config.num_epochs)
     if config.verbose:
-        progress_bar = tqdm(progress_bar, "Training")
+        progress_bar = tqdm(progress_bar, config.experiment_name)
 
     for epoch in progress_bar:
         total_loss = 0.0
@@ -95,7 +96,7 @@ def train(model, dataloader, optimizer, config):
 
         average_loss = total_loss / len(dataloader)
         if config.verbose:
-            progress_bar.set_description(f"Epoch {epoch + 1}/{config.num_epochs}, Loss: {average_loss:.4f}")
+            progress_bar.set_description(f"[{config.experiment_name}] Epoch {epoch + 1}/{config.num_epochs}, Loss: {average_loss:.4f}")
         all_loss.append(average_loss)
 
     return all_loss
@@ -147,7 +148,7 @@ def evaluate(factory, model, metadata, config):
         next_state, reward, terminated, truncated, info = factory.model.step(action)
         state = next_state
         if config.verbose:
-            print(action, "=>", next_state, reward, terminated, truncated, info, sum(rewards), sep="\t")
+            print(action, "=>", next_state, reward, terminated, truncated, info, sum(all_rewards), sep="\t")
         if terminated or truncated:
             break
 
@@ -210,13 +211,18 @@ def main():
     os.makedirs(res_dir, exist_ok=True)
 
     results = {}
+    if os.path.exists(res_dir + "/results.json"):
+        with open(res_dir + "/results.json", "r") as file:
+            results = json.load(file)
+            print(results)
 
     for model in tqdm(( ModelName.DECISION_TRANSFORMER,
                         ModelName.BEHAVIOR_CLOSING,
                         ModelName.RNN4RL ), "Model"):
 
         model_name = model.name
-        results[model_name] = {}
+        if model_name not in results:
+            results[model_name] = {}
 
         if model is ModelName.BEHAVIOR_CLOSING: # rtg/reward indifferent
             rtgs = (True,)
@@ -225,31 +231,35 @@ def main():
 
         for rtg in tqdm(rtgs, f"{model_name} rtg"):
             rtg_name = "rtg" if rtg else "reward"
-            results[model_name][rtg_name] = {}
+            if rtg_name not in results[model_name]:
+                results[model_name][rtg_name] = {}
 
-            for n_states in tqdm([10, 100, 1_000, 10_000, 100_000, 1_000_000], f"{model_name} {rtg_name} States"):
+            for n_states in tqdm([100, 1_000, 10_000, 100_000, 1_000_000], f"{model_name} {rtg_name} States"):
                 s_name = f"S{n_states}"
-                results[model_name][rtg_name][s_name] = {}
+                if s_name not in results[model_name][rtg_name]:
+                    results[model_name][rtg_name][s_name] = {}
 
                 for n_actions in tqdm([2, 3, 4, 5, 10, 20, 50, 100], f"{model_name} {rtg_name} {s_name} Actions"):
                     a_name = f"A{n_actions}"
-                    results[model_name][rtg_name][s_name][a_name] = {}
+                    if a_name not in results[model_name][rtg_name][s_name]:
+                        results[model_name][rtg_name][s_name][a_name] = {}
 
-                    for n_rewards in tqdm([2, 3, 4, 5, 10], f"{model_name} {rtg_name} {s_name} {a_name} Rewards"):
+                    for n_rewards in tqdm([3, 4, 5, 10], f"{model_name} {rtg_name} {s_name} {a_name} Rewards"):
                         r_name = f"R{n_rewards}"
+                        if r_name not in results[model_name][rtg_name][s_name][a_name]:
+                            experiment_name = f"{model_name}_{rtg_name}_{s_name}_{a_name}_{r_name}"
+                            data_dir_name = f"S{n_states}_A{n_actions}_R{n_rewards}_T2_R1"
+                            data_dir = f"{base_dir}/{data_dir_name}/"
+                            if os.path.exists(data_dir + "model.json"):
+                                config = Config(data_dir, model)
+                                config.rtg = rtg
+                                config.plot_dir = f"{res_dir}/plots"
+                                config.experiment_name = experiment_name
+                                score = run(config)
 
-                        experiment_name = f"{model_name}_{rtg_name}_{s_name}_{a_name}_{r_name}"
-                        data_dir_name = f"S{n_states}_A{n_actions}_R{n_rewards}_T2_R1"
-                        data_dir = f"{base_dir}/{data_dir_name}/"
-                        config = Config(data_dir, model)
-                        config.rtg = rtg
-                        config.plot_dir = f"{res_dir}/plots"
-                        config.experiment_name = experiment_name
-                        score = run(config)
-
-                        results[model_name][rtg_name][s_name][a_name][r_name] = score
-                        with open(res_dir + "/results.json", "w") as file:
-                            json.dump(results, file)
+                                results[model_name][rtg_name][s_name][a_name][r_name] = score
+                                with open(res_dir + "/results.json", "w") as file:
+                                    json.dump(results, file)
 
 
 if __name__ == "__main__":
