@@ -194,6 +194,7 @@ def run(config):
 
     all_loss = train(model, dataloader, optimizer, config)
     os.makedirs(config.plot_dir, exist_ok=True)
+    plt.figure()
     plt.plot(all_loss)
     plt.savefig(config.plot_dir + f"/{config.experiment_name}_loss.png")
 
