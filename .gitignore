@@ -3,4 +3,4 @@ tests_ignore/
 src_ignore/
 .gitignore
 **/.DS_Store
-results/plots/
+results/
